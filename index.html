@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multiplayer Rock Paper Scissors</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="card">
+        <p class="eyebrow">Multiplayer Game</p>
+        <h1>Rock Paper Scissors</h1>
+        <p id="status" class="status">Connecting to game server...</p>
+
+        <div id="connection-panel" class="connection-panel">
+          <label for="server-url">Backend WebSocket URL</label>
+          <div class="connection-row">
+            <input
+              id="server-url"
+              type="url"
+              placeholder="ws://localhost:3000 or wss://your-tunnel-url"
+              autocomplete="off"
+            />
+            <button id="connect-button" type="button">Connect</button>
+          </div>
+          <p class="hint">
+            Use <code>ws://localhost:3000</code> locally. Use a <code>wss://</code>
+            tunnel URL when this page is hosted on GitHub Pages.
+          </p>
+        </div>
+
+        <div class="player-panel">
+          <span id="player-label">Player: not assigned</span>
+          <span id="game-label">Game: none</span>
+        </div>
+
+        <div id="choices" class="choices" aria-label="Choose your move">
+          <button class="choice-button" type="button" data-move="rock">Rock</button>
+          <button class="choice-button" type="button" data-move="paper">Paper</button>
+          <button class="choice-button" type="button" data-move="scissors">Scissors</button>
+        </div>
+
+        <section id="result-card" class="result-card" aria-live="polite">
+          <h2 id="result-title">Waiting for a match</h2>
+          <p id="result-detail">Open this page in two browsers to start a game.</p>
+        </section>
+
+        <div class="actions">
+          <button id="play-again-button" type="button" hidden>Play again</button>
+          <button id="leave-button" type="button" hidden>Leave game</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
