@@ -36,7 +36,7 @@ go mod tidy
 Start the backend on your PC:
 
 ```sh
-go run .
+./scripts/start-backend.sh
 ```
 
 By default the backend listens here:
@@ -48,7 +48,13 @@ ws://localhost:3000
 You can change the port with the `PORT` environment variable:
 
 ```sh
-PORT=4000 go run .
+PORT=4000 ./scripts/start-backend.sh
+```
+
+Or pass the port as the first argument:
+
+```sh
+./scripts/start-backend.sh 4000
 ```
 
 To build a reusable backend executable:
@@ -113,7 +119,7 @@ becomes:
 wss://example-tunnel.trycloudflare.com
 ```
 
-Keep your PC awake and keep both `go run .` and the tunnel running while people
+Keep your PC awake and keep both `./scripts/start-backend.sh` and the tunnel running while people
 are playing. If either process stops, players will disconnect.
 
 ## Deploy The Frontend To GitHub Pages
