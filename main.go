@@ -133,7 +133,7 @@ func handleMessage(currentPlayer *player, message clientMessage) {
 	case "play_again":
 		markReadyForRematch(currentPlayer)
 	case "leave_game":
-		leaveGame(currentPlayer, true)
+		leaveGame(currentPlayer, false)
 	default:
 		flushMessages([]outboundMessage{{
 			player: currentPlayer,

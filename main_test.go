@@ -65,6 +65,35 @@ func TestOpponentDisconnectRequeuesRemainingPlayer(t *testing.T) {
 	readUntilType(t, second, "waiting")
 }
 
+func TestLeaveGameDoesNotRequeueLeavingPlayer(t *testing.T) {
+	resetServerState()
+	server := httptest.NewServer(httpHandler())
+	defer server.Close()
+
+	first := connectTestPlayer(t, server.URL)
+	defer first.Close()
+	second := connectTestPlayer(t, server.URL)
+	defer second.Close()
+	third := connectTestPlayer(t, server.URL)
+	defer third.Close()
+
+	writeTestMessage(t, first, clientMessage{Type: "join_queue"})
+	writeTestMessage(t, second, clientMessage{Type: "join_queue"})
+
+	readUntilType(t, first, "game_started")
+	readUntilType(t, second, "game_started")
+
+	writeTestMessage(t, third, clientMessage{Type: "join_queue"})
+	readUntilType(t, third, "waiting")
+
+	writeTestMessage(t, first, clientMessage{Type: "leave_game"})
+
+	readUntilType(t, second, "opponent_left")
+	readUntilType(t, second, "game_started")
+	readUntilType(t, third, "game_started")
+	assertNoMessageType(t, first, "waiting", "game_started")
+}
+
 func httpHandler() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", handleRequest)
@@ -121,4 +150,26 @@ func readUntilType(t *testing.T, conn *websocket.Conn, messageType string) serve
 
 	t.Fatalf("timed out waiting for message type %q", messageType)
 	return serverMessage{}
+}
+
+func assertNoMessageType(t *testing.T, conn *websocket.Conn, forbiddenTypes ...string) {
+	t.Helper()
+
+	forbidden := map[string]bool{}
+	for _, messageType := range forbiddenTypes {
+		forbidden[messageType] = true
+	}
+
+	if err := conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+
+	var message serverMessage
+	if err := conn.ReadJSON(&message); err != nil {
+		return
+	}
+
+	if forbidden[message.Type] {
+		t.Fatalf("received forbidden message type %q", message.Type)
+	}
 }

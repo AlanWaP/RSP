@@ -70,9 +70,12 @@ playAgainButton.addEventListener("click", () => {
 leaveButton.addEventListener("click", () => {
   resetRound();
   send({ type: "leave_game" });
-  setStatus("Looking for a new opponent...");
-  setResult("Back in queue", "You will be matched when another player is waiting.");
+  gameId = undefined;
+  updateLabels();
+  setStatus("You left the game.");
+  setResult("Not in queue", "Refresh the page or reconnect if you want to play again.");
   playAgainButton.hidden = true;
+  leaveButton.hidden = true;
 });
 
 function connect(rawUrl) {

@@ -33,13 +33,20 @@ Install Go, then download dependencies:
 go mod tidy
 ```
 
-Start the backend on your PC:
+Start the backend and Cloudflare Tunnel on your PC:
 
 ```sh
 ./scripts/start-backend.sh
 ```
 
-By default the backend listens here:
+The script starts the Go backend, starts `cloudflared`, waits for the public
+tunnel URL, then prints the full GitHub Pages URL to open. It will look like:
+
+```text
+https://AlanWaP.github.io/RSP/?server=wss://example.trycloudflare.com
+```
+
+By default the local backend listens here:
 
 ```text
 ws://localhost:3000
@@ -55,6 +62,12 @@ Or pass the port as the first argument:
 
 ```sh
 ./scripts/start-backend.sh 4000
+```
+
+You need `cloudflared` installed:
+
+```sh
+brew install cloudflare/cloudflare/cloudflared
 ```
 
 To build a reusable backend executable:
@@ -92,22 +105,15 @@ go test ./...
 ## Expose Your PC Backend
 
 When the frontend is on GitHub Pages, other players need a public HTTPS/WSS URL
-that reaches the backend on your PC. A tunnel is the easiest way to do this.
-
-Cloudflare Tunnel example:
-
-```sh
-cloudflared tunnel --url http://localhost:3000
-```
-
-ngrok example:
+that reaches the backend on your PC. The startup script runs Cloudflare Tunnel
+for you:
 
 ```sh
-ngrok http 3000
+./scripts/start-backend.sh
 ```
 
-The tunnel tool will print a public HTTPS URL. Convert that URL to WebSocket by
-using `wss://` in the game page. For example:
+The tunnel tool prints a public HTTPS URL. The script converts that URL to
+WebSocket by using `wss://` and prints the complete game URL. For example:
 
 ```text
 https://example-tunnel.trycloudflare.com
