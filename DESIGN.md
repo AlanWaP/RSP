@@ -7,12 +7,11 @@ This project uses a static browser frontend with a Go WebSocket backend.
 - Frontend: `index.html`, `style.css`, and `script.js`
 - Backend: `main.go`
 - Backend tests: `main_test.go`
-- Study-only old Node backend: `study/node-backend/`
-- Old Node-backend design doc: `study/multiplayer_rps_design_node_backend.plan.md`
 
 GitHub Pages hosts only the static frontend files. The Go backend runs
 separately on your PC or another host and must be reachable by the browser over
-WebSocket.
+WebSocket. The current UI connects first, shows a main page, and only enters
+matchmaking after the player clicks `Enter waiting queue`.
 
 ## Architecture
 
@@ -40,15 +39,20 @@ wss://YOUR_TUNNEL_URL
 ## Runtime Flow
 
 1. A browser opens the static page.
-2. `script.js` opens a WebSocket connection to the backend.
-3. The browser sends `join_queue`.
-4. `main.go` stores the player in the waiting queue.
-5. When two players are waiting, `main.go` creates a game room.
-6. Both browsers receive `game_started`.
-7. Each browser sends `submit_move`.
-8. The backend waits until both moves arrive.
-9. The backend calculates win, lose, or draw.
-10. Both browsers receive `round_result`.
+2. `script.js` chooses the backend URL from `?server=`, local storage, or
+   `ws://localhost:3000` on localhost.
+3. `script.js` opens a WebSocket connection to the backend.
+4. The connected player sees the main page and clicks `Enter waiting queue`.
+5. The browser sends `join_queue`.
+6. `main.go` stores the player in the waiting queue.
+7. When two players are waiting, `main.go` creates a game room.
+8. Both browsers receive `game_started`.
+9. Each browser sends `submit_move`.
+10. The backend waits until both moves arrive.
+11. The backend calculates win, lose, or draw.
+12. Both browsers receive `round_result`.
+13. The frontend offers `Play new game` or `Back to main page`. `Play new game`
+    sends another `join_queue` request for fresh matchmaking.
 
 ```mermaid
 sequenceDiagram
@@ -59,6 +63,7 @@ sequenceDiagram
   A->>S: join_queue
   S->>A: waiting
   B->>S: join_queue
+  S->>B: waiting
   S->>A: game_started
   S->>B: game_started
   A->>S: submit_move rock
@@ -105,14 +110,21 @@ Client to server:
 { "type": "leave_game" }
 ```
 
+The current browser UI uses `join_queue`, `submit_move`, and `leave_game`.
+`play_again` is still supported by the backend for same-room rematches, but the
+current UI's `Play new game` button sends `join_queue` instead.
+
 Server to client:
 
 ```json
 { "type": "waiting", "playerId": "player_abcd1234" }
+{ "type": "already_queued", "playerId": "player_abcd1234" }
 { "type": "game_started", "gameId": "game_abcd1234", "playerId": "player_abcd1234" }
 { "type": "opponent_moved" }
 { "type": "round_result", "yourMove": "rock", "opponentMove": "scissors", "result": "win" }
 { "type": "opponent_left" }
+{ "type": "left_game", "reason": "queue_left" }
+{ "type": "not_queued" }
 { "type": "error", "message": "Move must be rock, paper, or scissors." }
 ```
 
@@ -126,9 +138,15 @@ the same messages.
 - A move is not revealed until both players have submitted.
 - A player can submit only one move per round.
 - If a queued player disconnects, they are removed from the queue.
-- If a player disconnects during a game, the opponent receives `opponent_left`
-  and is returned to the waiting queue.
-- If both players choose `play_again`, the same room starts another round.
+- If a queued player clicks `Back to main page`, the backend removes them from
+  the queue and sends `left_game` with reason `queue_left`.
+- If a player leaves or disconnects during an active game, the opponent receives
+  `opponent_left`. Neither player is automatically requeued.
+- After a finished round, `join_queue` removes the player from the finished game
+  and places them in fresh matchmaking.
+- If both players send `play_again` after a finished round, the same room starts
+  another round. This path is supported by the backend but is not used by the
+  current browser UI.
 
 ## Deployment Shape
 
@@ -161,4 +179,6 @@ The tests cover:
 
 - Pairing two waiting players
 - Submitting moves and receiving win or lose results
-- Requeueing the remaining player after opponent disconnect
+- Notifying the remaining player when an opponent disconnects
+- Keeping players out of matchmaking after leaving a queue or active game
+- Letting a finished player join a new queue without notifying the old opponent
