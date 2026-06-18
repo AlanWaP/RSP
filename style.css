@@ -14,6 +14,35 @@ body {
   margin: 0;
 }
 
+.github-link {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 46px;
+  height: 46px;
+  border: 1px solid #dfe4f2;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #182033;
+  place-items: center;
+  box-shadow: 0 10px 30px rgba(24, 32, 51, 0.12);
+  transition: color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 10;
+}
+
+.github-link:hover {
+  color: #3a63f3;
+  transform: translateY(-1px);
+  box-shadow: 0 14px 36px rgba(24, 32, 51, 0.16);
+}
+
+.github-link svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
 button,
 input {
   font: inherit;
@@ -52,15 +81,6 @@ button:disabled {
   border-radius: 28px;
   background: #ffffff;
   box-shadow: 0 24px 80px rgba(24, 32, 51, 0.12);
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: #3a63f3;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 h1 {
