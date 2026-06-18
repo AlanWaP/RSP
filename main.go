@@ -52,6 +52,7 @@ type serverMessage struct {
 	OpponentMove string `json:"opponentMove,omitempty"`
 	Result       string `json:"result,omitempty"`
 	Message      string `json:"message,omitempty"`
+	Reason       string `json:"reason,omitempty"`
 }
 
 type outboundMessage struct {
@@ -168,6 +169,13 @@ func enqueuePlayerLocked(currentPlayer *player, messages *[]outboundMessage) {
 
 	for _, playerID := range waitingPlayers {
 		if playerID == currentPlayer.id {
+			*messages = append(*messages, outboundMessage{
+				player: currentPlayer,
+				body: serverMessage{
+					Type:     "already_queued",
+					PlayerID: currentPlayer.id,
+				},
+			})
 			return
 		}
 	}
@@ -367,7 +375,7 @@ func leaveGame(currentPlayer *player, requeue bool) {
 }
 
 func leaveGameLocked(currentPlayer *player, requeue bool, messages *[]outboundMessage) {
-	removeFromQueueLocked(currentPlayer.id)
+	wasQueued := removeFromQueueLocked(currentPlayer.id)
 
 	currentGame := games[currentPlayer.gameID]
 	if currentGame == nil {
@@ -376,7 +384,35 @@ func leaveGameLocked(currentPlayer *player, requeue bool, messages *[]outboundMe
 		if requeue {
 			enqueuePlayerLocked(currentPlayer, messages)
 			matchWaitingPlayersLocked(messages)
+			return
 		}
+
+		messageType := "not_queued"
+		reason := ""
+		if wasQueued {
+			messageType = "left_game"
+			reason = "queue_left"
+		}
+		*messages = append(*messages, outboundMessage{
+			player: currentPlayer,
+			body: serverMessage{
+				Type:   messageType,
+				Reason: reason,
+			},
+		})
+		return
+	}
+
+	if currentGame.status == statusFinished {
+		delete(games, currentGame.id)
+		currentPlayer.gameID = ""
+		currentPlayer.readyForRematch = false
+
+		if requeue {
+			enqueuePlayerLocked(currentPlayer, messages)
+			matchWaitingPlayersLocked(messages)
+		}
+
 		return
 	}
 
@@ -391,7 +427,6 @@ func leaveGameLocked(currentPlayer *player, requeue bool, messages *[]outboundMe
 			player: opponent,
 			body:   serverMessage{Type: "opponent_left"},
 		})
-		enqueuePlayerLocked(opponent, messages)
 	}
 
 	if requeue {
@@ -413,14 +448,18 @@ func removePlayer(currentPlayer *player) {
 	currentPlayer.conn.Close()
 }
 
-func removeFromQueueLocked(playerID string) {
+func removeFromQueueLocked(playerID string) bool {
+	removed := false
 	filtered := waitingPlayers[:0]
 	for _, waitingPlayerID := range waitingPlayers {
 		if waitingPlayerID != playerID {
 			filtered = append(filtered, waitingPlayerID)
+		} else {
+			removed = true
 		}
 	}
 	waitingPlayers = filtered
+	return removed
 }
 
 func getOpponentLocked(currentPlayer *player, currentGame *game) *player {

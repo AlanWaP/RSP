@@ -42,7 +42,7 @@ func TestTwoPlayerRound(t *testing.T) {
 	}
 }
 
-func TestOpponentDisconnectRequeuesRemainingPlayer(t *testing.T) {
+func TestOpponentDisconnectStopsGameForRemainingPlayer(t *testing.T) {
 	resetServerState()
 	server := httptest.NewServer(httpHandler())
 	defer server.Close()
@@ -62,7 +62,32 @@ func TestOpponentDisconnectRequeuesRemainingPlayer(t *testing.T) {
 	}
 
 	readUntilType(t, second, "opponent_left")
-	readUntilType(t, second, "waiting")
+	assertNoMessageType(t, second, "waiting", "game_started")
+}
+
+func TestLeaveQueueKeepsPlayerOutOfMatchmaking(t *testing.T) {
+	resetServerState()
+	server := httptest.NewServer(httpHandler())
+	defer server.Close()
+
+	first := connectTestPlayer(t, server.URL)
+	defer first.Close()
+	second := connectTestPlayer(t, server.URL)
+	defer second.Close()
+	third := connectTestPlayer(t, server.URL)
+	defer third.Close()
+
+	writeTestMessage(t, first, clientMessage{Type: "join_queue"})
+	readUntilType(t, first, "waiting")
+	writeTestMessage(t, first, clientMessage{Type: "leave_game"})
+	readUntilType(t, first, "left_game")
+
+	writeTestMessage(t, second, clientMessage{Type: "join_queue"})
+	writeTestMessage(t, third, clientMessage{Type: "join_queue"})
+
+	readUntilType(t, second, "game_started")
+	readUntilType(t, third, "game_started")
+	assertNoMessageType(t, first, "waiting", "game_started")
 }
 
 func TestLeaveGameDoesNotRequeueLeavingPlayer(t *testing.T) {
@@ -89,9 +114,40 @@ func TestLeaveGameDoesNotRequeueLeavingPlayer(t *testing.T) {
 	writeTestMessage(t, first, clientMessage{Type: "leave_game"})
 
 	readUntilType(t, second, "opponent_left")
-	readUntilType(t, second, "game_started")
-	readUntilType(t, third, "game_started")
+	assertNoMessageType(t, second, "waiting", "game_started")
+	assertNoMessageType(t, third, "game_started")
 	assertNoMessageType(t, first, "waiting", "game_started")
+}
+
+func TestFinishedPlayerCanJoinNewQueueWithoutStoppingOpponent(t *testing.T) {
+	resetServerState()
+	server := httptest.NewServer(httpHandler())
+	defer server.Close()
+
+	first := connectTestPlayer(t, server.URL)
+	defer first.Close()
+	second := connectTestPlayer(t, server.URL)
+	defer second.Close()
+	third := connectTestPlayer(t, server.URL)
+	defer third.Close()
+
+	writeTestMessage(t, first, clientMessage{Type: "join_queue"})
+	writeTestMessage(t, second, clientMessage{Type: "join_queue"})
+	readUntilType(t, first, "game_started")
+	readUntilType(t, second, "game_started")
+
+	writeTestMessage(t, first, clientMessage{Type: "submit_move", Move: "rock"})
+	writeTestMessage(t, second, clientMessage{Type: "submit_move", Move: "scissors"})
+	readUntilType(t, first, "round_result")
+	readUntilType(t, second, "round_result")
+
+	writeTestMessage(t, first, clientMessage{Type: "join_queue"})
+	readUntilType(t, first, "waiting")
+	writeTestMessage(t, third, clientMessage{Type: "join_queue"})
+
+	readUntilType(t, first, "game_started")
+	readUntilType(t, third, "game_started")
+	assertNoMessageType(t, second, "opponent_left", "game_started")
 }
 
 func httpHandler() *http.ServeMux {
@@ -132,24 +188,20 @@ func writeTestMessage(t *testing.T, conn *websocket.Conn, message clientMessage)
 func readUntilType(t *testing.T, conn *websocket.Conn, messageType string) serverMessage {
 	t.Helper()
 
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if err := conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond)); err != nil {
-			t.Fatalf("set read deadline: %v", err)
-		}
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
 
+	for {
 		var message serverMessage
 		if err := conn.ReadJSON(&message); err != nil {
-			continue
+			t.Fatalf("read message while waiting for type %q: %v", messageType, err)
 		}
 
 		if message.Type == messageType {
 			return message
 		}
 	}
-
-	t.Fatalf("timed out waiting for message type %q", messageType)
-	return serverMessage{}
 }
 
 func assertNoMessageType(t *testing.T, conn *websocket.Conn, forbiddenTypes ...string) {

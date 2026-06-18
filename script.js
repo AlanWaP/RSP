@@ -6,8 +6,10 @@ const playerLabel = document.querySelector("#player-label");
 const gameLabel = document.querySelector("#game-label");
 const resultTitle = document.querySelector("#result-title");
 const resultDetail = document.querySelector("#result-detail");
+const joinQueueButton = document.querySelector("#join-queue-button");
 const playAgainButton = document.querySelector("#play-again-button");
 const leaveButton = document.querySelector("#leave-button");
+const mainButton = document.querySelector("#main-button");
 const choiceButtons = Array.from(document.querySelectorAll(".choice-button"));
 
 const urlParams = new URLSearchParams(window.location.search);
@@ -24,6 +26,7 @@ let socket;
 let playerId;
 let gameId;
 let submittedMove;
+let isQueued = false;
 
 serverUrlInput.value = defaultServerUrl;
 setChoicesEnabled(false);
@@ -59,23 +62,28 @@ choiceButtons.forEach((button) => {
   });
 });
 
+joinQueueButton.addEventListener("click", () => {
+  joinQueue();
+});
+
 playAgainButton.addEventListener("click", () => {
-  resetRound();
-  send({ type: "play_again" });
-  setStatus("Waiting for the next round...");
-  setResult("Ready for another round", "Waiting for your opponent to be ready.");
-  playAgainButton.hidden = true;
+  joinQueue();
 });
 
 leaveButton.addEventListener("click", () => {
   resetRound();
   send({ type: "leave_game" });
+  isQueued = false;
   gameId = undefined;
   updateLabels();
   setStatus("You left the game.");
-  setResult("Not in queue", "Refresh the page or reconnect if you want to play again.");
-  playAgainButton.hidden = true;
-  leaveButton.hidden = true;
+  setResult("Game stopped", "The other player was notified that you left.");
+  showPostGameActions();
+});
+
+mainButton.addEventListener("click", () => {
+  send({ type: "leave_game" });
+  showMainPage();
 });
 
 function connect(rawUrl) {
@@ -97,8 +105,7 @@ function connect(rawUrl) {
   socket.addEventListener("open", () => {
     connectionPanel.hidden = true;
     connectButton.disabled = false;
-    setStatus("Connected. Waiting for another player...");
-    send({ type: "join_queue" });
+    showMainPage();
   });
 
   socket.addEventListener("message", (event) => {
@@ -113,6 +120,7 @@ function connect(rawUrl) {
     leaveButton.hidden = true;
     playerId = undefined;
     gameId = undefined;
+    isQueued = false;
     updateLabels();
     setStatus("Disconnected from game server.");
     setResult("Connection closed", "Reconnect when your backend server is available.");
@@ -136,24 +144,31 @@ function handleServerMessage(rawMessage) {
   if (message.type === "waiting") {
     playerId = message.playerId || playerId;
     gameId = undefined;
+    isQueued = true;
     resetRound();
     updateLabels();
     setStatus("Waiting for another player...");
     setResult("Waiting room", "Keep this page open while the backend finds a match.");
+    joinQueueButton.hidden = true;
+    playAgainButton.hidden = true;
     leaveButton.hidden = true;
+    mainButton.hidden = false;
     return;
   }
 
   if (message.type === "game_started") {
     playerId = message.playerId;
     gameId = message.gameId;
+    isQueued = false;
     resetRound();
     updateLabels();
     setChoicesEnabled(true);
     setStatus("Game started. Choose rock, paper, or scissors.");
     setResult("Choose your move", "Your opponent will not see it until both moves are in.");
+    joinQueueButton.hidden = true;
     playAgainButton.hidden = true;
     leaveButton.hidden = false;
+    mainButton.hidden = true;
     return;
   }
 
@@ -168,21 +183,56 @@ function handleServerMessage(rawMessage) {
 
   if (message.type === "round_result") {
     setChoicesEnabled(false);
+    isQueued = false;
+    gameId = undefined;
+    updateLabels();
     showRoundResult(message);
-    playAgainButton.hidden = false;
-    leaveButton.hidden = false;
+    showPostGameActions();
     return;
   }
 
   if (message.type === "opponent_left") {
     resetRound();
+    isQueued = false;
     gameId = undefined;
     updateLabels();
     setChoicesEnabled(false);
-    setStatus("Your opponent left. Waiting for a new player...");
-    setResult("Opponent left", "The backend has returned you to the waiting queue.");
+    setStatus("The other player left.");
+    setResult("Game stopped", "Choose whether to play a new game or return to the main page.");
+    showPostGameActions();
+    return;
+  }
+
+  if (message.type === "left_game") {
+    isQueued = false;
+    gameId = undefined;
+    updateLabels();
+    if (message.reason === "queue_left") {
+      showMainPage();
+    }
+    return;
+  }
+
+  if (message.type === "not_queued") {
+    isQueued = false;
+    gameId = undefined;
+    updateLabels();
+    if (!mainButton.hidden) {
+      showMainPage();
+    }
+    return;
+  }
+
+  if (message.type === "already_queued") {
+    isQueued = true;
+    gameId = undefined;
+    updateLabels();
+    setStatus("Already waiting for another player...");
+    setResult("Waiting room", "Keep this page open while the backend finds a match.");
+    joinQueueButton.hidden = true;
     playAgainButton.hidden = true;
     leaveButton.hidden = true;
+    mainButton.hidden = false;
     return;
   }
 
@@ -211,6 +261,46 @@ function send(message) {
   if (socket && socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(message));
   }
+}
+
+function joinQueue() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    setStatus("Connect to the game server first.");
+    return;
+  }
+
+  resetRound();
+  gameId = undefined;
+  isQueued = true;
+  updateLabels();
+  send({ type: "join_queue" });
+  setStatus("Joining the waiting queue...");
+  setResult("Joining queue", "Waiting for the backend to confirm your place.");
+  joinQueueButton.hidden = true;
+  playAgainButton.hidden = true;
+  leaveButton.hidden = true;
+  mainButton.hidden = false;
+}
+
+function showMainPage() {
+  resetRound();
+  gameId = undefined;
+  isQueued = false;
+  updateLabels();
+  setStatus("Connected. Enter the queue when you want to play.");
+  setResult("Main page", "You are not in the waiting queue yet.");
+  joinQueueButton.hidden = false;
+  playAgainButton.hidden = true;
+  leaveButton.hidden = true;
+  mainButton.hidden = true;
+}
+
+function showPostGameActions() {
+  setChoicesEnabled(false);
+  joinQueueButton.hidden = true;
+  playAgainButton.hidden = false;
+  leaveButton.hidden = true;
+  mainButton.hidden = false;
 }
 
 function setStatus(text) {
