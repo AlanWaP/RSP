@@ -38,6 +38,7 @@ body {
 }
 
 .github-link svg {
+  display: block;
   width: 24px;
   height: 24px;
   fill: currentColor;
