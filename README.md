@@ -49,9 +49,10 @@ After installing Go, download the Go dependencies once:
 go mod tidy
 ```
 
-## Test Locally
+## Test Locally In Browser
 
-Use this when you want to test the full game on your own computer.
+Use this when you want to play through the game manually on your own computer.
+This tests the backend and frontend together.
 
 Start the backend:
 
@@ -80,7 +81,11 @@ http://localhost:8080
 The page automatically uses `ws://localhost:3000` when opened from `localhost`.
 Click `Enter waiting queue` in both tabs to simulate two players.
 
-You can also run the backend tests:
+## Run Automated Backend Tests
+
+Use this when you want to run the Go test suite without opening the browser.
+These tests check backend matchmaking, move submission, and leave/disconnect
+behavior.
 
 ```sh
 go test ./...
@@ -131,13 +136,6 @@ Or pass the port as the first argument:
 
 ```sh
 ./scripts/start-backend.sh 4000
-```
-
-To build a reusable backend executable without Cloudflare Tunnel:
-
-```sh
-go build -o rsp-server .
-./rsp-server
 ```
 
 ## Important Notes
