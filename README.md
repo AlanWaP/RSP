@@ -28,34 +28,100 @@ testing that URL is usually `ws://localhost:3000`. From GitHub Pages it must be
 a secure `wss://` URL. The page also accepts a `server` query parameter and
 stores the most recent backend URL in local storage.
 
-## Run The Backend Locally
+## Prerequisites
 
-Install Go, then download dependencies:
+Install these before running the game:
+
+- Go, for running the backend.
+- Python 3, optional but useful for serving the frontend locally.
+- `cloudflared`, only needed when playing from GitHub Pages or sharing with
+  another player over the internet.
+
+On macOS, you can install `cloudflared` with Homebrew:
+
+```sh
+brew install cloudflare/cloudflare/cloudflared
+```
+
+After installing Go, download the Go dependencies once:
 
 ```sh
 go mod tidy
 ```
 
-Start the backend and Cloudflare Tunnel on your PC:
+## Test Locally
+
+Use this when you want to test the full game on your own computer.
+
+Start the backend:
 
 ```sh
-./scripts/start-backend.sh
+go run .
 ```
 
-The script starts the Go backend, starts `cloudflared`, waits for the public
-tunnel URL, then prints the full GitHub Pages URL to open. It will look like:
-
-```text
-https://AlanWaP.github.io/RSP/?server=wss://example.trycloudflare.com
-```
-
-By default the local backend listens here:
+The backend listens at:
 
 ```text
 ws://localhost:3000
 ```
 
-You can change the port with the `PORT` environment variable:
+In another terminal, serve the frontend:
+
+```sh
+python3 -m http.server 8080
+```
+
+Then open this page in two browser tabs:
+
+```text
+http://localhost:8080
+```
+
+The page automatically uses `ws://localhost:3000` when opened from `localhost`.
+Click `Enter waiting queue` in both tabs to simulate two players.
+
+You can also run the backend tests:
+
+```sh
+go test ./...
+```
+
+## Play From GitHub Pages
+
+Use this when you want to browse the hosted frontend or share the game with
+another player. GitHub Pages hosts the static frontend, but the backend still
+runs on your computer.
+
+Start the backend and Cloudflare Tunnel:
+
+```sh
+./scripts/start-backend.sh
+```
+
+The script starts the Go backend, starts `cloudflared`, waits for a public
+tunnel URL, then prints the complete frontend URL to open:
+
+```text
+https://AlanWaP.github.io/RSP/?server=wss://example.trycloudflare.com
+```
+
+Open that URL in your browser or share it with another player while the script
+keeps running. The `server` query parameter tells the static frontend which live
+backend tunnel to use.
+
+By default, the script uses this GitHub Pages frontend:
+
+```text
+https://AlanWaP.github.io/RSP/
+```
+
+If you host the frontend somewhere else, set `PAGES_URL`:
+
+```sh
+PAGES_URL=https://YOUR_USERNAME.github.io/YOUR_REPO/ ./scripts/start-backend.sh
+```
+
+You can change the backend port with the `PORT` environment variable:
 
 ```sh
 PORT=4000 ./scripts/start-backend.sh
@@ -67,89 +133,12 @@ Or pass the port as the first argument:
 ./scripts/start-backend.sh 4000
 ```
 
-You need `cloudflared` installed:
-
-```sh
-brew install cloudflare/cloudflare/cloudflared
-```
-
-To build a reusable backend executable:
+To build a reusable backend executable without Cloudflare Tunnel:
 
 ```sh
 go build -o rsp-server .
 ./rsp-server
 ```
-
-## Test Locally
-
-Start the backend first, then open `index.html` directly in two browser tabs.
-If that is blocked by browser file restrictions, serve the directory with a
-simple static server:
-
-```sh
-python3 -m http.server 8080
-```
-
-Then open:
-
-```text
-http://localhost:8080
-```
-
-The page will automatically use `ws://localhost:3000` when opened from
-`localhost`. Open it in two tabs or two browsers, connect both tabs, then click
-`Enter waiting queue` in each tab to simulate two players.
-
-You can also run the backend tests:
-
-```sh
-go test ./...
-```
-
-## Expose Your PC Backend
-
-When the frontend is on GitHub Pages, other players need a public HTTPS/WSS URL
-that reaches the backend on your PC. The startup script runs Cloudflare Tunnel
-for you:
-
-```sh
-./scripts/start-backend.sh
-```
-
-The tunnel tool prints a public HTTPS URL. The script converts that URL to a
-WebSocket URL by using `wss://` and prints the complete game URL. For example:
-
-```text
-https://example-tunnel.trycloudflare.com
-```
-
-becomes:
-
-```text
-wss://example-tunnel.trycloudflare.com
-```
-
-Keep your PC awake and keep `./scripts/start-backend.sh` running while people
-are playing. If the backend or tunnel stops, players will disconnect.
-
-## Deploy The Frontend To GitHub Pages
-
-The frontend is already hosted by GitHub Pages. To play from that page, start
-the backend and Cloudflare Tunnel:
-
-```sh
-./scripts/start-backend.sh
-```
-
-The script prints the complete frontend URL to open in your browser:
-
-```text
-https://AlanWaP.github.io/RSP/?server=wss://example.trycloudflare.com
-```
-
-Open that URL in two browser tabs or share it with another player while the
-script keeps running. The `server` query parameter tells the static frontend
-which live backend tunnel to use.
 
 ## Important Notes
 
